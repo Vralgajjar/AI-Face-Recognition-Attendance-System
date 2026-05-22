@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FaceAttend — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body>
+
+  {% include 'partials/navbar.html' ignore missing %}
+
+  <!-- Inline navbar since no partials support -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="logo-icon">◈</span>
+      <span class="logo-text">FaceAttend</span>
+    </div>
+    <div class="nav-links">
+      <a href="{{ url_for('dashboard') }}" class="nav-link active">Dashboard</a>
+      <a href="{{ url_for('attendance_page') }}" class="nav-link">Attendance</a>
+      <a href="{{ url_for('report') }}" class="nav-link">Reports</a>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">◑</button>
+      <div class="nav-user">
+        <span class="user-avatar">{{ username[0].upper() }}</span>
+        <span class="user-name">{{ username }}</span>
+      </div>
+      <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+    </div>
+    <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+  </nav>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <p class="sidebar-label">Navigation</p>
+        <a href="{{ url_for('dashboard') }}" class="sidebar-link active">
+          <span class="sl-icon">⊞</span> Dashboard
+        </a>
+        <a href="{{ url_for('attendance_page') }}" class="sidebar-link">
+          <span class="sl-icon">◉</span> Take Attendance
+        </a>
+        <a href="{{ url_for('report') }}" class="sidebar-link">
+          <span class="sl-icon">≡</span> Reports
+        </a>
+      </div>
+      <div class="sidebar-section">
+        <p class="sidebar-label">System</p>
+        <a href="#students" class="sidebar-link">
+          <span class="sl-icon">👤</span> Students
+        </a>
+        <a href="#train-section" class="sidebar-link">
+          <span class="sl-icon">🤖</span> Train Model
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible">
+            <span class="alert-icon">{% if category == 'success' %}✓{% else %}⚠{% endif %}</span>
+            {{ message }}
+            <button onclick="this.parentElement.remove()" class="alert-close">×</button>
+          </div>
+        {% endfor %}
+      {% endwith %}
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-sub">Overview of your attendance system</p>
+        </div>
+        <div class="page-actions">
+          <a href="{{ url_for('attendance_page') }}" class="btn-primary">
+            <span>◉</span> Take Attendance
+          </a>
+        </div>
+      </div>
+
+      <!-- Stats Cards -->
+      <div class="stats-grid">
+        <div class="stat-card stat-card--blue">
+          <div class="stat-icon">👥</div>
+          <div class="stat-content">
+            <div class="stat-number" id="total-students">{{ stats.total_students }}</div>
+            <div class="stat-label">Total Students</div>
+          </div>
+          <div class="stat-trend">Registered</div>
+        </div>
+        <div class="stat-card stat-card--green">
+          <div class="stat-icon">✓</div>
+          <div class="stat-content">
+            <div class="stat-number" id="total-attendance">{{ stats.total_attendance }}</div>
+            <div class="stat-label">Total Attendance</div>
+          </div>
+          <div class="stat-trend">All time</div>
+        </div>
+        <div class="stat-card stat-card--orange">
+          <div class="stat-icon">📅</div>
+          <div class="stat-content">
+            <div class="stat-number" id="today-count">{{ stats.today_attendance }}</div>
+            <div class="stat-label">Today's Count</div>
+          </div>
+          <div class="stat-trend">Today</div>
+        </div>
+        <div class="stat-card stat-card--purple">
+          <div class="stat-icon">📈</div>
+          <div class="stat-content">
+            <div class="stat-number">
+              {% if stats.total_students > 0 %}
+                {{ ((stats.today_attendance / stats.total_students) * 100) | round | int }}%
+              {% else %}0%{% endif %}
+            </div>
+            <div class="stat-label">Today's Rate</div>
+          </div>
+          <div class="stat-trend">Attendance %</div>
+        </div>
+      </div>
+
+      <!-- Analytics Bar Chart -->
+      <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+          <h2 class="card-title">Last 7 Days Attendance</h2>
+        </div>
+        <div class="card-body">
+          <div class="bar-chart-container">
+            {% if stats.daily_counts %}
+              {% for row in stats.daily_counts %}
+                <div class="bar-item">
+                  <div class="bar-fill" style="height: calc({{ row.count }} * 20px + 10px)" title="{{ row.count }} students">
+                    <span class="bar-val">{{ row.count }}</span>
+                  </div>
+                  <div class="bar-label">{{ row.date[-5:] }}</div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="empty-state">No attendance data yet.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Two Column: Add Student + Train Model -->
+      <div class="two-col-grid">
+
+        <!-- Add Student Form -->
+        <div class="card" id="students">
+          <div class="card-header">
+            <h2 class="card-title">Add New Student</h2>
+          </div>
+          <div class="card-body">
+            <form method="POST" action="{{ url_for('add_student_route') }}">
+              <div class="field-group">
+                <label>Full Name</label>
+                <input type="text" name="name" placeholder="e.g. Rahul Sharma" required/>
+              </div>
+              <div class="field-group">
+                <label>Roll Number</label>
+                <input type="text" name="roll_number" placeholder="e.g. CS2021001" required/>
+              </div>
+              <div class="field-group">
+                <label>College Name</label>
+                <input type="text" name="college" placeholder="e.g. MIT Engineering College" required/>
+              </div>
+              <button type="submit" class="btn-primary btn-full">
+                + Add Student
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Train Model Card -->
+        <div class="card" id="train-section">
+          <div class="card-header">
+            <h2 class="card-title">AI Model Training</h2>
+          </div>
+          <div class="card-body">
+            <div class="train-info">
+              <div class="train-icon">🤖</div>
+              <p>After capturing face images for all students, train the recognition model to enable attendance marking.</p>
+            </div>
+            <div id="train-status" class="status-box" style="display:none;"></div>
+            <button class="btn-primary btn-full" onclick="trainModel()" id="train-btn">
+              ⚡ Train Face Recognition Model
+            </button>
+            <div class="train-steps">
+              <div class="step">
+                <span class="step-num">1</span>
+                <span>Add students above</span>
+              </div>
+              <div class="step">
+                <span class="step-num">2</span>
+                <span>Capture each student's face (button in table)</span>
+              </div>
+              <div class="step">
+                <span class="step-num">3</span>
+                <span>Train model here</span>
+              </div>
+              <div class="step">
+                <span class="step-num">4</span>
+                <span>Mark attendance!</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Students Table -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Registered Students</h2>
+          <span class="badge">{{ students | length }}</span>
+        </div>
+        <div class="card-body p0">
+          {% if students %}
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Roll No.</th>
+                  <th>College</th>
+                  <th>Face ID</th>
+                  <th>Registered</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in students %}
+                <tr>
+                  <td>{{ loop.index }}</td>
+                  <td>
+                    <div class="student-name-cell">
+                      <span class="avatar-sm">{{ s.name[0].upper() }}</span>
+                      {{ s.name }}
+                    </div>
+                  </td>
+                  <td><code>{{ s.roll_number }}</code></td>
+                  <td>{{ s.college }}</td>
+                  <td><span class="badge badge--blue">ID: {{ s.face_id }}</span></td>
+                  <td>{{ s.registered_at[:10] }}</td>
+                  <td>
+                    <div class="action-btns">
+                      <button class="btn-sm btn-capture" onclick="captureFace({{ s.face_id }}, '{{ s.name }}')">
+                        📷 Capture
+                      </button>
+                      <form method="POST" action="{{ url_for('delete_student_route', student_id=s.id) }}" onsubmit="return confirm('Delete {{ s.name }}?')">
+                        <button type="submit" class="btn-sm btn-danger">🗑</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="empty-state-box">
+            <div class="empty-icon">👥</div>
+            <p>No students registered yet.<br/>Add your first student using the form above.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Capture Modal -->
+  <div class="modal-overlay" id="capture-modal" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>📷 Face Capture</h3>
+        <button onclick="closeModal()" class="modal-close">×</button>
+      </div>
+      <div class="modal-body">
+        <p id="capture-student-name" class="modal-student"></p>
+        <div id="capture-status" class="status-box loading">
+          <span class="spinner"></span>
+          Starting camera...
+        </div>
+        <div class="capture-instructions">
+          <strong>Instructions:</strong>
+          <ul>
+            <li>A webcam window will open on your computer</li>
+            <li>Look directly at the camera</li>
+            <li>50 images will be captured automatically</li>
+            <li>Press <kbd>Q</kbd> to stop early</li>
+            <li>Ensure good lighting</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button onclick="closeModal()" class="btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  <script>
+    function captureFace(faceId, name) {
+      document.getElementById('capture-student-name').textContent = 'Capturing face for: ' + name;
+      document.getElementById('capture-modal').style.display = 'flex';
+      document.getElementById('capture-status').innerHTML = '<span class="spinner"></span> Starting camera...';
+      document.getElementById('capture-status').className = 'status-box loading';
+
+      fetch('/capture/' + faceId, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            document.getElementById('capture-status').innerHTML = '📷 ' + data.message + ' — webcam window is now open.';
+            document.getElementById('capture-status').className = 'status-box info';
+            pollTrainingStatus('capture-status');
+          } else {
+            document.getElementById('capture-status').innerHTML = '⚠ ' + data.message;
+            document.getElementById('capture-status').className = 'status-box error';
+          }
+        });
+    }
+
+    function closeModal() {
+      document.getElementById('capture-modal').style.display = 'none';
+    }
+
+    function trainModel() {
+      const btn = document.getElementById('train-btn');
+      const status = document.getElementById('train-status');
+      btn.disabled = true;
+      btn.textContent = '⏳ Training...';
+      status.style.display = 'block';
+      status.className = 'status-box loading';
+      status.innerHTML = '<span class="spinner"></span> Training model, please wait...';
+
+      fetch('/train', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            pollTrainingStatus('train-status', () => {
+              btn.disabled = false;
+              btn.textContent = '⚡ Train Face Recognition Model';
+            });
+          } else {
+            status.innerHTML = '⚠ ' + data.message;
+            status.className = 'status-box error';
+            btn.disabled = false;
+            btn.textContent = '⚡ Train Face Recognition Model';
+          }
+        });
+    }
+
+    function pollTrainingStatus(targetId, callback) {
+      const interval = setInterval(() => {
+        fetch('/training-status')
+          .then(r => r.json())
+          .then(data => {
+            if (data.done) {
+              clearInterval(interval);
+              const el = document.getElementById(targetId);
+              el.innerHTML = (data.success ? '✓ ' : '⚠ ') + data.message;
+              el.className = 'status-box ' + (data.success ? 'success' : 'error');
+              if (callback) callback();
+            }
+          });
+      }, 1500);
+    }
+  </script>
+</body>
+</html>

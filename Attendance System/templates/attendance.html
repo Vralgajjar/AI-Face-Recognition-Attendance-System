@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FaceAttend — Take Attendance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="logo-icon">◈</span>
+      <span class="logo-text">FaceAttend</span>
+    </div>
+    <div class="nav-links">
+      <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+      <a href="{{ url_for('attendance_page') }}" class="nav-link active">Attendance</a>
+      <a href="{{ url_for('report') }}" class="nav-link">Reports</a>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">◑</button>
+      <div class="nav-user">
+        <span class="user-avatar">{{ username[0].upper() }}</span>
+        <span class="user-name">{{ username }}</span>
+      </div>
+      <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+    </div>
+    <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+  </nav>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <p class="sidebar-label">Navigation</p>
+        <a href="{{ url_for('dashboard') }}" class="sidebar-link">
+          <span class="sl-icon">⊞</span> Dashboard
+        </a>
+        <a href="{{ url_for('attendance_page') }}" class="sidebar-link active">
+          <span class="sl-icon">◉</span> Take Attendance
+        </a>
+        <a href="{{ url_for('report') }}" class="sidebar-link">
+          <span class="sl-icon">≡</span> Reports
+        </a>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Take Attendance</h1>
+          <p class="page-sub">AI-powered face recognition attendance marking</p>
+        </div>
+      </div>
+
+      <div class="attendance-layout">
+
+        <!-- Camera Card -->
+        <div class="card attendance-camera-card">
+          <div class="card-header">
+            <h2 class="card-title">◉ Face Recognition</h2>
+            <span id="live-badge" class="badge badge--red" style="display:none;">● LIVE</span>
+          </div>
+          <div class="card-body">
+            <div class="camera-preview" id="camera-preview">
+              <div class="camera-idle">
+                <div class="camera-icon">📷</div>
+                <p>Camera inactive</p>
+                <p class="camera-sub">Press "Start Attendance" to begin face recognition</p>
+              </div>
+            </div>
+
+            <div id="attendance-status" class="status-box" style="display:none;"></div>
+
+            <div class="camera-controls">
+              <button class="btn-primary btn-full btn-large" id="start-btn" onclick="startAttendance()">
+                ◉ Start Attendance
+              </button>
+            </div>
+
+            <div class="attendance-note">
+              <strong>Note:</strong> A separate OpenCV window will open. Look at the camera until your face is recognized, then press <kbd>Q</kbd> to finish.
+            </div>
+          </div>
+        </div>
+
+        <!-- Results Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">✓ Marked Today</h2>
+            <span class="badge badge--green" id="marked-count">0</span>
+          </div>
+          <div class="card-body p0">
+            <div id="marked-list">
+              <div class="empty-state-box">
+                <div class="empty-icon">🎯</div>
+                <p>No attendance marked yet today.<br/>Start the camera to begin.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- How It Works -->
+      <div class="card how-it-works">
+        <div class="card-header">
+          <h2 class="card-title">How It Works</h2>
+        </div>
+        <div class="card-body">
+          <div class="steps-grid">
+            <div class="how-step">
+              <div class="how-step-num">1</div>
+              <div class="how-step-text">
+                <strong>Register Students</strong>
+                <p>Add student details in the Dashboard</p>
+              </div>
+            </div>
+            <div class="how-step">
+              <div class="how-step-num">2</div>
+              <div class="how-step-text">
+                <strong>Capture Faces</strong>
+                <p>Use the capture button next to each student</p>
+              </div>
+            </div>
+            <div class="how-step">
+              <div class="how-step-num">3</div>
+              <div class="how-step-text">
+                <strong>Train the Model</strong>
+                <p>Train the AI model from the Dashboard</p>
+              </div>
+            </div>
+            <div class="how-step">
+              <div class="how-step-num">4</div>
+              <div class="how-step-text">
+                <strong>Take Attendance</strong>
+                <p>Press Start — faces are recognized automatically</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  <script>
+    let attendanceRunning = false;
+
+    function startAttendance() {
+      if (attendanceRunning) return;
+      attendanceRunning = true;
+
+      const btn = document.getElementById('start-btn');
+      const status = document.getElementById('attendance-status');
+      const liveBadge = document.getElementById('live-badge');
+      const preview = document.getElementById('camera-preview');
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Recognizing...';
+      status.style.display = 'block';
+      status.className = 'status-box loading';
+      status.innerHTML = '<span class="spinner"></span> Opening camera... A webcam window will appear on your screen.';
+      liveBadge.style.display = 'inline-flex';
+
+      // Animated preview
+      preview.innerHTML = `
+        <div class="camera-active">
+          <div class="scan-animation">
+            <div class="scan-line"></div>
+            <div class="corner tl"></div>
+            <div class="corner tr"></div>
+            <div class="corner bl"></div>
+            <div class="corner br"></div>
+          </div>
+          <p class="scanning-text">Scanning faces...</p>
+          <p class="scanning-sub">OpenCV window is active on your desktop</p>
+        </div>
+      `;
+
+      fetch('/attendance/start', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          attendanceRunning = false;
+          liveBadge.style.display = 'none';
+          btn.disabled = false;
+          btn.innerHTML = '◉ Start Attendance';
+          preview.innerHTML = `
+            <div class="camera-idle">
+              <div class="camera-icon">${data.success ? '✓' : '⚠'}</div>
+              <p>${data.success ? 'Recognition complete' : 'Session ended'}</p>
+            </div>
+          `;
+
+          status.innerHTML = (data.success ? '✓ ' : '⚠ ') + data.message;
+          status.className = 'status-box ' + (data.success ? 'success' : 'error');
+
+          if (data.marked && data.marked.length > 0) {
+            renderMarkedList(data.marked);
+            document.getElementById('marked-count').textContent = data.marked.length;
+          }
+        })
+        .catch(err => {
+          attendanceRunning = false;
+          btn.disabled = false;
+          btn.innerHTML = '◉ Start Attendance';
+          liveBadge.style.display = 'none';
+          status.innerHTML = '⚠ Error: ' + err.message;
+          status.className = 'status-box error';
+        });
+    }
+
+    function renderMarkedList(students) {
+      const list = document.getElementById('marked-list');
+      list.innerHTML = students.map(s => `
+        <div class="marked-student-row">
+          <div class="marked-avatar">${s.name[0].toUpperCase()}</div>
+          <div class="marked-info">
+            <strong>${s.name}</strong>
+            <span>${s.roll_number} &middot; ${s.college}</span>
+          </div>
+          <div class="marked-time">
+            <span class="badge badge--green">✓ ${s.time}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
