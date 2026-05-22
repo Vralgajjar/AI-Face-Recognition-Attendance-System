@@ -1,4 +1,5 @@
-CV, the system features a complete dashboard for managing students, capturing face samples, training an LBPH model on-the-fly, and generating detailed Excel/CSV attendance reports.
+AI-Based Smart Attendance System
+An intelligent, full-stack web application that automates student attendance tracking using face recognition. Built with Flask and OpenCV, the system features a complete dashboard for managing students, capturing face samples, training an LBPH model on-the-fly, and generating detailed Excel/CSV attendance reports.
 
 🚀 Key Features
 Secure Authentication: Multi-user access with secure session management and SHA-256 hashed password authentication.
